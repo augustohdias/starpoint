@@ -5,6 +5,13 @@ import { getAccountPlayers, getPlayerCharacterManaNodesSync, getPlayerCharacterS
 import { generateDataHeaders } from "../../utils";
 import { getCharacterDataSync, getCharacterManaNodeSync, getCharacterManaNodesSync } from "../../lib/assets";
 import { clientSerializeDate } from "../../data/utils";
+import { givePlayerCharacterSync } from "../../lib/character";
+
+interface AddCharacterFromTownBody {
+    viewer_id: number
+    character_id: number
+    api_count: number
+}
 
 interface OverLimitBody {
     viewer_id: number
@@ -53,6 +60,58 @@ const openManaBoardRequiredUncaps: Record<number, number> = {
 }
 
 const routes = async (fastify: FastifyInstance) => {
+    fastify.post("/add_character_from_town", async (request: FastifyRequest, reply: FastifyReply) => {
+        const body = request.body as AddCharacterFromTownBody
+
+        const viewerId = body.viewer_id
+        const characterId = body.character_id
+        if (isNaN(viewerId) || isNaN(characterId)) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Invalid request body."
+        })
+
+        const viewerIdSession = await getSession(viewerId.toString())
+        if (!viewerIdSession) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Invalid viewer id."
+        })
+
+        // get player id
+        const playerIds = await getAccountPlayers(viewerIdSession.accountId)
+        const playerId = playerIds[0]
+        if (playerId === undefined) return reply.status(500).send({
+            "error": "Internal Server Error",
+            "message": "No players bound to account."
+        })
+
+        // give the character
+        const giveResult = givePlayerCharacterSync(playerId, characterId)
+        if (giveResult === null) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Could not give player character."
+        })
+
+        const items: Record<number, number> = {}
+        if (giveResult.item !== undefined) {
+            items[giveResult.item.id] = giveResult.item.count
+        }
+
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send({
+            "data_headers": generateDataHeaders({
+                viewer_id: viewerId
+            }),
+            "data": {
+                "character_list": [
+                    giveResult.character
+                ],
+                "item_list": items,
+                "encyclopedia_info": [],
+                "mail_arrived": false
+            }
+        })
+    })
+
     fastify.post("/set_illustration_settings", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as SetIllustrationSettingsBody
 
@@ -343,12 +402,14 @@ const routes = async (fastify: FastifyInstance) => {
         }
 
         // validate that the player has enough materials to unlock these nodes
-        // TODO: Allow the usage of paidMana
-        const newMana = player.freeMana - manaCost
-        if (0 > newMana) return reply.status(400).send({
+        // (free mana is consumed first, then paid mana)
+        const totalMana = player.freeMana + player.paidMana
+        if (manaCost > totalMana) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Not enough mana."
         })
+        const newMana = Math.max(0, player.freeMana - manaCost)
+        const newPaidMana = newMana === 0 ? player.paidMana - (manaCost - player.freeMana) : player.paidMana
 
         for (const [itemId, itemCost] of Object.entries(itemsCosts)) {
             const item = getPlayerItemSync(playerId, itemId)
@@ -365,7 +426,8 @@ const routes = async (fastify: FastifyInstance) => {
         // deduct mana
         updatePlayerSync({
             id: playerId,
-            freeMana: newMana
+            freeMana: newMana,
+            paidMana: newPaidMana
         })
 
         // deduct item amounts
@@ -417,7 +479,8 @@ const routes = async (fastify: FastifyInstance) => {
             }),
             "data": {
                 "user_info": {
-                    "free_mana": newMana
+                    "free_mana": newMana,
+                    "paid_mana": newPaidMana
                 },
                 "character_list": [
                     {

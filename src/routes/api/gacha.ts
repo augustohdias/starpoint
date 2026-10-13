@@ -282,9 +282,32 @@ const routes = async (fastify: FastifyInstance) => {
                     "message": "Already did daily paid summon."
                 })
 
-                playerPaidVmoney -= isCharacterGacha ? 50 : 25
+                // free portals (paymentType 1) don't cost anything;
+                // other portals use the daily discounted price.
+                playerPaidVmoney -= gachaData.paymentType === 1 ? 0 : (isCharacterGacha ? 50 : 25)
 
                 pullCount = 1
+
+                // free portals are campaign-backed: consume the daily campaign count
+                // so the client's free-pull state stays consistent.
+                if (gachaData.paymentType === 1) {
+                    const gachaCampaignId = getGachaCampaignIdSync(gachaId)
+                    if (gachaCampaignId !== null) {
+                        const existing = getPlayerGachaCampaignSync(playerId, gachaId, gachaCampaignId)
+                        const playerCampaignData = existing ?? {
+                            gachaId: gachaId,
+                            campaignId: gachaCampaignId,
+                            count: 1
+                        }
+                        playerCampaignData.count = 0
+                        if (existing === null) {
+                            insertPlayerGachaCampaignSync(playerId, playerCampaignData)
+                        } else {
+                            updatePlayerGachaCampaignSync(playerId, gachaId, gachaCampaignId, 0)
+                        }
+                        gachaCampaigns.push(serializeGachaCampaign(playerCampaignData))
+                    }
+                }
                 break;
             }
 
@@ -384,6 +407,54 @@ const routes = async (fastify: FastifyInstance) => {
 
         reply.header("content-type", "application/x-msgpack")
         if (isCharacterGacha) {
+            // free portals (paymentType 1): mimic the official response shape
+            // (docs/routes/gacha_exec.md) which the client expects for these pulls.
+            if (gachaData.paymentType === 1) {
+                const encyclopedia: Record<string, { read: boolean }> = {}
+                const enrichedCharacters = rewardResult.characters.map(character => {
+                    const serialized = character as Record<string, any>
+                    if (serialized.stack !== undefined && serialized.viewer_id === undefined) {
+                        // enrich dupe entries to match the official shape
+                        return {
+                            viewer_id: viewerId,
+                            ...serialized,
+                            exp: serialized.exp ?? 0,
+                            exp_total: serialized.exp_total ?? 0
+                        }
+                    }
+                    if (serialized.entry_count !== undefined) {
+                        encyclopedia[`1${serialized.character_id}01`] = { read: false }
+                    }
+                    return serialized
+                })
+
+                return reply.status(200).send({
+                    "data_headers": generateDataHeaders({
+                        viewer_id: viewerId
+                    }),
+                    "data": {
+                        "draw": rewardResult.draw.map(draw => ({ "null": 1, ...draw })),
+                        "gacha_info_list": [
+                            {
+                                "gacha_id": gachaId,
+                                "is_account_first": false,
+                                "gacha_exchange_point": newGachaExchangePoint
+                            }
+                        ],
+                        "user_info": {
+                            "free_vmoney": playerFreeVmoney
+                        },
+                        "character_list": enrichedCharacters,
+                        "item_list": {
+                            ...items,
+                            ...rewardResult.items
+                        },
+                        "encyclopedia_info": encyclopedia,
+                        "mission_info": [],
+                        "mail_arrived": false
+                    }
+                })
+            }
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({
                     viewer_id: viewerId

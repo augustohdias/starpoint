@@ -15,3 +15,5 @@ build
 .mitmproxy/mitmdump.exe
 .unzip-temp
 .cn-cdn
+.mitmproxy/
+generated/

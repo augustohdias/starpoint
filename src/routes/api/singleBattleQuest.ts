@@ -161,6 +161,9 @@ const routes = async (fastify: FastifyInstance) => {
         const questPreviouslyCompleted = questProgress !== null
         const questAccomplished = body.is_accomplished
 
+        // first clear bonus: 15 paid gems
+        const questBonusPaidVmoney = questPreviouslyCompleted ? 0 : 15
+
         const clearReward = !questPreviouslyCompleted && questData.clearReward !== undefined ? givePlayerRewardSync(playerId, questData.clearReward) : null
         const sPlusClearReward = (clearRank === 5) && (questProgress?.clearRank !== 5) && (questData.sPlusReward !== undefined) ? givePlayerRewardSync(playerId, questData.sPlusReward) : null
         if (questAccomplished) {
@@ -193,7 +196,9 @@ const routes = async (fastify: FastifyInstance) => {
             expPool: newExpPool,
             rankPoint: newRankPoint,
             boostPoint: newBoostPoint,
-            bossBoostPoint: newBossBoostPoint
+            bossBoostPoint: newBossBoostPoint,
+            // quest completion bonus: 150 paid gems per quest
+            vmoney: playerData.vmoney + questBonusPaidVmoney
         })
 
         // reward score rewards
@@ -325,6 +330,7 @@ const routes = async (fastify: FastifyInstance) => {
                     "exp_pool": rewardCharacterExpResult.exp_pool + (clearReward?.user_info.exp_pool || 0) + scoreRewardsResult.user_info.exp_pool,
                     "exp_pooled_time": getServerTime(playerData.expPooledTime),
                     "free_vmoney": playerData.freeVmoney + (clearReward?.user_info.free_vmoney || 0) + (sPlusClearReward?.user_info.free_vmoney || 0) + scoreRewardsResult.user_info.free_vmoney,
+                    "vmoney": playerData.vmoney + questBonusPaidVmoney,
                     "rank_point": newRankPoint,
                     "stamina": playerData.stamina,
                     "stamina_heal_time": getServerTime(playerData.staminaHealTime),

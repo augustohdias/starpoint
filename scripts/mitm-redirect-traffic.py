@@ -29,8 +29,9 @@ hosts = {
     "patch.wdfp.kakaogames.com": 3
 }
 
-def dns_request(flow: dns.DNSFlow):
-    if not flow.request.query or flow.request.questions is None: return
+def dns_response(flow: dns.DNSFlow):
+    # Must run on the response hook: flow.response only exists after the upstream answer arrives
+    if flow.response is None or not flow.request.query or flow.request.questions is None: return
     #logging.info(f"[INFO] DNS request for {flow.request.questions}")
     for question in flow.request.questions:
         name = question.name

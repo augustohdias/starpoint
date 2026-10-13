@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { getAccountPlayers, getPlayerSingleQuestProgressSync, getPlayerSync, getSession, insertPlayerQuestProgressSync, updatePlayerQuestProgressSync } from "../../data/wdfpData";
+import { getAccountPlayers, getPlayerSingleQuestProgressSync, getPlayerSync, getSession, insertPlayerQuestProgressSync, updatePlayerQuestProgressSync, updatePlayerSync } from "../../data/wdfpData";
 import { getQuestFromCategorySync } from "../../lib/assets";
 import { givePlayerRewardSync } from "../../lib/quest";
 import { generateDataHeaders } from "../../utils";
@@ -54,6 +54,13 @@ const routes = async (fastify: FastifyInstance) => {
         const finished = questProgress !== null ? questProgress.finished : false
         const rewardResult = !finished && questData.clearReward !== undefined ? givePlayerRewardSync(playerId, questData.clearReward) : null
 
+        // first clear bonus: 15 paid gems
+        const questBonusPaidVmoney = finished ? 0 : 15
+        updatePlayerSync({
+            id: playerId,
+            vmoney: playerData.vmoney + questBonusPaidVmoney
+        })
+
         if (!finished) {
             // update quest progress
             if (questProgress === null) {
@@ -77,6 +84,7 @@ const routes = async (fastify: FastifyInstance) => {
             }),
             "data": !finished ? {
                 "user_info": {
+                    "vmoney": playerData.vmoney + questBonusPaidVmoney,
                     "free_vmoney": playerData.freeVmoney + (rewardResult?.user_info.free_vmoney || 0),
                     "free_mana": playerData.freeMana + (rewardResult?.user_info.free_mana || 0)
                 },

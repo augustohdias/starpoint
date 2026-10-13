@@ -241,7 +241,7 @@ export function serializePlayerData(
     let userTutorial: UserTutorial | null = null
     const playerData = toSerialize.player
     const tutorialStep = playerData.tutorialStep
-    if (tutorialStep !== null && toSerialize.triggeredTutorial.find((value: number) => value === 12) === undefined) {
+    if (tutorialStep !== null && playerData.tutorialSkipFlag !== true && toSerialize.triggeredTutorial.find((value: number) => value === 12) === undefined) {
         userTutorial = {
             "viewer_id": options?.viewerId ?? 0,
             "tutorial_step": tutorialStep,

@@ -18,6 +18,13 @@ const routes = async (fastify: FastifyInstance) => {
         reply.send(html)
     })
 
+    fastify.get("/characters", async (_: FastifyRequest, reply: FastifyReply) => {
+        const html = readFileSync(path.join(__dirname, staticPagesDir, "characters.html")).toString("utf-8")
+
+        reply.header("content-type", "text/html; charset=utf-8")
+        reply.send(html)
+    })
+
     fastify.register(playerRoutePlugin, { prefix: "/player" })
 }
 

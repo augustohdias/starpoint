@@ -33,6 +33,15 @@
                 </svg>
                 Players
             </a>
+            <a href="/characters"
+                class="px-5 py-3 flex gap-3 items-center rounded-full hover:bg-surface-container-high text-on-surface text-lg transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"
+                    class="fill-on-surface">
+                    <path
+                        d="m233-120 65-281L80-590l288-25 112-265 112 265 288 25-218 189 65 281-247-149-247 149Z" />
+                </svg>
+                Characters
+            </a>
             <a href="https://github.com/Duosion/starpoint"
                 class="px-5 py-3 flex gap-3 items-center rounded-full hover:bg-surface-container-high text-on-surface text-lg transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"
@@ -46,31 +55,236 @@
         <article class="w-full flex flex-col">
             <h1 class="text-4xl font-bold mb-4 text-on-background">Player "{{playerName}}"</h1>
             <h2 class="text-2xl text-on-surface-variant mt-2">"{{playerComment}}"</h2>
-            <section
-                class="mt-5 flex flex-col items-center justify-center p-5 border border-outline-variant bg-surface-container rounded-3xl w-full gap-5">
-                <h3 class="text-xl text-on-background font-semibold mt-2">Download a copy of this player's save data in JSON
-                    format.</h3>
-                <a href="/api/player/save?id={{playerId}}"
-                    class="text-base bg-primary text-on-primary h-[40px] px-[24px] rounded-full flex items-center justify-center relative before:transition-opacity before:absolute before:w-full before:h-full before:left-0 before:top-0 before:rounded-full before:opacity-0 before:hover:bg-on-primary before:hover:opacity-[0.12] transition-opacity">
-                    Download Save
-                </a>
-            </section>
-            <form
-                class="mt-5 flex flex-col items-center justify-center p-5 border border-outline-variant bg-surface-container rounded-3xl w-full gap-5"
-                method="post" 
-                action="/api/player/save?id={{playerId}}"
-                enctype="multipart/form-data">
-                <h3 class="text-xl text-on-background font-semibold mt-2">Upload new save data.</h3>
-                <input id="save-data" name="save-data" type="file" accept=".json,.txt" required/>
-                {{uploadError}}
-                <button
-                    type="submit"
-                    class="text-base bg-primary text-on-primary h-[40px] px-[24px] rounded-full flex items-center justify-center relative before:transition-opacity before:absolute before:w-full before:h-full before:left-0 before:top-0 before:rounded-full before:opacity-0 before:hover:bg-on-primary before:hover:opacity-[0.12] transition-opacity">
-                    Upload Save
-                </button>
-            </form>
+
+            <div class="mt-5 flex gap-3 w-full" role="tablist">
+                <button id="tab-save-data" type="button" role="tab" aria-selected="true"
+                    class="tab-button px-5 py-3 flex-1 md:flex-none flex gap-3 items-center justify-center rounded-full text-lg transition-colors bg-primary text-on-primary font-bold">Save
+                    Data</button>
+                <button id="tab-live-edit" type="button" role="tab" aria-selected="false"
+                    class="tab-button px-5 py-3 flex-1 md:flex-none flex gap-3 items-center justify-center rounded-full text-lg transition-colors hover:bg-surface-container-high text-on-surface">Live
+                    Edit</button>
+            </div>
+
+            <div id="panel-save-data" class="tab-panel flex flex-col w-full">
+                <section
+                    class="mt-5 flex flex-col items-center justify-center p-5 border border-outline-variant bg-surface-container rounded-3xl w-full gap-5">
+                    <h3 class="text-xl text-on-background font-semibold mt-2">Download a copy of this player's save data in JSON
+                        format.</h3>
+                    <a href="/api/player/save?id={{playerId}}"
+                        class="text-base bg-primary text-on-primary h-[40px] px-[24px] rounded-full flex items-center justify-center relative before:transition-opacity before:absolute before:w-full before:h-full before:left-0 before:top-0 before:rounded-full before:opacity-0 before:hover:bg-on-primary before:hover:opacity-[0.12] transition-opacity">
+                        Download Save
+                    </a>
+                </section>
+                <form
+                    class="mt-5 flex flex-col items-center justify-center p-5 border border-outline-variant bg-surface-container rounded-3xl w-full gap-5"
+                    method="post"
+                    action="/api/player/save?id={{playerId}}"
+                    enctype="multipart/form-data">
+                    <h3 class="text-xl text-on-background font-semibold mt-2">Upload new save data.</h3>
+                    <input id="save-data" name="save-data" type="file" accept=".json,.txt" required />
+                    {{uploadError}}
+                    <button
+                        type="submit"
+                        class="text-base bg-primary text-on-primary h-[40px] px-[24px] rounded-full flex items-center justify-center relative before:transition-opacity before:absolute before:w-full before:h-full before:left-0 before:top-0 before:rounded-full before:opacity-0 before:hover:bg-on-primary before:hover:opacity-[0.12] transition-opacity">
+                        Upload Save
+                    </button>
+                </form>
+            </div>
+
+            <div id="panel-live-edit" class="tab-panel hidden flex-col w-full">
+                <section
+                    class="mt-5 flex flex-col p-5 border border-outline-variant bg-surface-container rounded-3xl w-full gap-5">
+                    <h3 class="text-xl text-on-background font-semibold mt-2">Edit this player's data live. Values are applied
+                        to the server immediately on save.</h3>
+                    <div id="live-edit-status" class="hidden text-base font-semibold rounded-full px-5 py-3 w-full"></div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-separate border-spacing-y-2">
+                            <thead>
+                                <tr class="text-on-surface-variant">
+                                    <th class="pl-5 pr-3 font-semibold">Field</th>
+                                    <th class="px-3 font-semibold">Current</th>
+                                    <th class="px-3 font-semibold w-full">New value</th>
+                                </tr>
+                            </thead>
+                            <tbody id="live-edit-rows"></tbody>
+                        </table>
+                    </div>
+                    <div class="flex flex-wrap gap-3 items-center justify-center">
+                        <button id="live-edit-refresh" type="button"
+                            class="text-base bg-surface-container-high text-on-surface h-[40px] px-[24px] rounded-full flex items-center justify-center relative before:transition-opacity before:absolute before:w-full before:h-full before:left-0 before:top-0 before:rounded-full before:opacity-0 before:hover:bg-on-surface before:hover:opacity-[0.12] transition-opacity">
+                            Refresh
+                        </button>
+                        <button id="live-edit-save" type="button"
+                            class="text-base bg-primary text-on-primary h-[40px] px-[24px] rounded-full flex items-center justify-center relative before:transition-opacity before:absolute before:w-full before:h-full before:left-0 before:top-0 before:rounded-full before:opacity-0 before:hover:bg-on-primary before:hover:opacity-[0.12] transition-opacity disabled:opacity-50 disabled:before:opacity-0 disabled:before:hover:opacity-0">
+                            Save Changes
+                        </button>
+                    </div>
+                </section>
+            </div>
         </article>
     </div>
+
+    <script>
+        var PLAYER_ID = "{{playerId}}";
+
+        // editable fields shown in the live edit table
+        var LIVE_EDIT_FIELDS = [
+            ["name", "Name", "text"],
+            ["comment", "Comment", "text"],
+            ["vmoney", "Gems (paid)", "number"],
+            ["freeVmoney", "Gems (free)", "number"],
+            ["freeMana", "Mana (free)", "number"],
+            ["paidMana", "Mana (paid)", "number"],
+            ["starCrumb", "Star Crumb", "number"],
+            ["bondToken", "Bond Tokens", "number"],
+            ["rankPoint", "Rank Points", "number"],
+            ["stamina", "Stamina", "number"],
+            ["boostPoint", "Boost Points", "number"],
+            ["bossBoostPoint", "Boss Boost Points", "number"],
+            ["expPool", "EXP Pool", "number"]
+        ];
+
+        var liveEditState = null;
+
+        // tabs
+        var tabButtons = document.querySelectorAll(".tab-button");
+        var tabPanels = document.querySelectorAll(".tab-panel");
+        var tabIds = ["save-data", "live-edit"];
+        for (var i = 0; i < tabButtons.length; i++) {
+            tabButtons[i].addEventListener("click", switchTab.bind(null, tabIds[i]));
+        }
+
+        function switchTab(tabId) {
+            for (var i = 0; i < tabButtons.length; i++) {
+                var isActive = tabIds[i] === tabId;
+                tabButtons[i].setAttribute("aria-selected", isActive ? "true" : "false");
+                tabButtons[i].className = "tab-button px-5 py-3 flex-1 md:flex-none flex gap-3 items-center justify-center rounded-full text-lg transition-colors"
+                    + (isActive ? " bg-primary text-on-primary font-bold" : " hover:bg-surface-container-high text-on-surface");
+                tabPanels[i].className = "tab-panel w-full"
+                    + (isActive ? " flex flex-col" : " hidden");
+            }
+            if (tabId === "live-edit") refreshLiveEditState();
+        }
+
+        // live edit
+        document.getElementById("live-edit-refresh").addEventListener("click", refreshLiveEditState);
+        document.getElementById("live-edit-save").addEventListener("click", saveLiveEditChanges);
+
+        function setLiveEditStatus(message, isError) {
+            var status = document.getElementById("live-edit-status");
+            status.textContent = message;
+            status.className = "text-base font-semibold rounded-full px-5 py-3 w-full text-center border"
+                + (isError
+                    ? " text-error border-error bg-error/10"
+                    : " text-primary border-primary bg-primary/10");
+        }
+
+        function clearLiveEditStatus() {
+            var status = document.getElementById("live-edit-status");
+            status.textContent = "";
+            status.className = "hidden";
+        }
+
+        function renderLiveEditRows() {
+            var tbody = document.getElementById("live-edit-rows");
+            tbody.innerHTML = "";
+            for (var i = 0; i < LIVE_EDIT_FIELDS.length; i++) {
+                var key = LIVE_EDIT_FIELDS[i][0];
+                var label = LIVE_EDIT_FIELDS[i][1];
+                var inputType = LIVE_EDIT_FIELDS[i][2];
+                var value = liveEditState[key];
+
+                var row = document.createElement("tr");
+                row.className = "bg-surface-container-low";
+
+                var fieldCell = document.createElement("td");
+                fieldCell.className = "pl-5 pr-3 py-3 rounded-l-3xl font-semibold";
+                fieldCell.textContent = label;
+
+                var currentCell = document.createElement("td");
+                currentCell.className = "px-3 py-3 text-on-surface-variant whitespace-nowrap";
+                currentCell.textContent = String(value);
+
+                var inputCell = document.createElement("td");
+                inputCell.className = "px-3 py-3 pr-5 rounded-r-3xl";
+
+                var input = document.createElement("input");
+                input.type = inputType;
+                input.min = "0";
+                input.step = "1";
+                input.value = String(value);
+                input.dataset.field = key;
+                input.className = "bg-surface-container-high border border-outline-variant rounded-full px-4 h-[40px] w-full max-w-md text-on-surface focus:outline-none focus:border-primary";
+
+                inputCell.appendChild(input);
+
+                row.appendChild(fieldCell);
+                row.appendChild(currentCell);
+                row.appendChild(inputCell);
+                tbody.appendChild(row);
+            }
+        }
+
+        function refreshLiveEditState() {
+            clearLiveEditStatus();
+            fetch("/api/player/state?id=" + encodeURIComponent(PLAYER_ID))
+                .then(function (response) {
+                    if (!response.ok) throw new Error("Failed to load player state (HTTP " + response.status + ").");
+                    return response.json();
+                })
+                .then(function (state) {
+                    liveEditState = state;
+                    renderLiveEditRows();
+                })
+                .catch(function (error) {
+                    setLiveEditStatus(error.message, true);
+                });
+        }
+
+        function saveLiveEditChanges() {
+            clearLiveEditStatus();
+            if (liveEditState === null) return;
+
+            var changes = {};
+            var inputs = document.querySelectorAll("#live-edit-rows input[data-field]");
+            for (var i = 0; i < inputs.length; i++) {
+                var input = inputs[i];
+                var key = input.dataset.field;
+                var rawValue = input.value;
+                var newValue = input.type === "number" ? parseInt(rawValue, 10) : rawValue;
+                if (String(newValue) === String(liveEditState[key])) continue;
+                if (input.type === "number" && (isNaN(newValue) || 0 > newValue)) {
+                    setLiveEditStatus("Invalid value for one of the numeric fields.", true);
+                    return;
+                }
+                changes[key] = newValue;
+            }
+
+            var changeCount = Object.keys(changes).length;
+            if (changeCount === 0) {
+                setLiveEditStatus("No changes to save.", false);
+                return;
+            }
+
+            fetch("/api/player/edit?id=" + encodeURIComponent(PLAYER_ID), {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify(changes)
+            })
+                .then(function (response) {
+                    return response.json().then(function (body) { return { ok: response.ok, body: body }; });
+                })
+                .then(function (result) {
+                    if (!result.ok) throw new Error(result.body.message || "Failed to save changes.");
+                    liveEditState = result.body;
+                    renderLiveEditRows();
+                    setLiveEditStatus("Saved " + changeCount + (changeCount === 1 ? " field." : " fields."), false);
+                })
+                .catch(function (error) {
+                    setLiveEditStatus(error.message, true);
+                });
+        }
+    </script>
 </body>
 
 </html>

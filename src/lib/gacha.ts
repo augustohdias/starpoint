@@ -109,12 +109,36 @@ export function drawGachaSync(
 
     const pulls: Map<number, number> = new Map()
 
+    // safety: some portals only define certain tiers (e.g. 5*-only pools).
+    // restrict draws to tiers that actually have items, renormalizing the
+    // original rates over the available ones. tier keys: "1"=5*, "2"=4*, "3"=3*.
+    const tierKeys = ["1", "2", "3"]
+    const availableTiers = tierKeys.filter(tier => (gacha.pool[tier]?.length ?? 0) > 0)
+    if (availableTiers.length === 0) return pulls
+    const tierRateIndex: Record<string, number> = { "1": 0, "2": 1, "3": 2 }
+
     for (let drawNumber = 0; drawNumber < drawAmount; drawNumber++) {
         const drawRankRates = (drawNumber !== 0) && ((drawNumber % 9) === 0) ? rankRates.multiGuarantee : rankRates.normal
-        
-        const ratePool = gacha.pool[(randomPoolItem(0, 1001, drawRankRates) ?? 0) + 1]
 
-        // pick item from pool
+        // build effective rates over available tiers (guarantee pulls exclude 3*)
+        let effectiveTiers: string[]
+        const guaranteeTiers = availableTiers.filter(tier => tier !== "3")
+        if (drawRankRates === rankRates.multiGuarantee && guaranteeTiers.length > 0) {
+            effectiveTiers = guaranteeTiers
+        } else {
+            effectiveTiers = availableTiers
+        }
+        let effectiveRates = effectiveTiers.map(tier => drawRankRates[tierRateIndex[tier]])
+        const rateSum = effectiveRates.reduce((a, b) => a + b, 0)
+        if (rateSum <= 0) {
+            effectiveRates = effectiveRates.map(() => 1000 / effectiveRates.length)
+        } else if (rateSum !== 1000) {
+            effectiveRates = effectiveRates.map(rate => rate * 1000 / rateSum)
+        }
+
+        const ratePool = gacha.pool[effectiveTiers[randomPoolItem(0, 1001, effectiveRates) ?? 0]]
+
+        // pick item from pool (original per-item odds, including rate-up bias)
         const selectedItem = ratePool[randomPoolItem(0, 1001, ratePool.map(item => item.rarity)) ?? 0]
         const selectedItemId = selectedItem.id
 

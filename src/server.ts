@@ -90,6 +90,23 @@ fastify.addContentTypeParser("application/x-www-form-urlencoded", { parseAs: 'st
 })
 fastify.addContentTypeParser('application/json', { parseAs: 'string' }, jsonParser)
 
+// log game api requests for debugging
+fastify.addHook('onResponse', (request, reply, done) => {
+    if (request.url.startsWith("/latest/api")) {
+        const body = request.body === undefined ? "" : " " + JSON.stringify(request.body).slice(0, 4000)
+        console.log(`[api] ${reply.statusCode} ${request.method} ${request.url}${body}`)
+    }
+    done()
+})
+
+// log serialized gacha responses for debugging
+fastify.addHook('onSend', async (request, reply, payload) => {
+    if (request.url.includes("gacha") && typeof payload === "string" && payload.length > 0) {
+        console.log(`[api-resp] ${reply.statusCode} ${request.url} ${payload.slice(0, 2500)}`)
+    }
+    return payload
+})
+
 // register plugins
 
 //api
