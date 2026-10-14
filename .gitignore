@@ -2,7 +2,8 @@ node_modules
 mitm_redirect
 .database
 scripts/in
-.cdn
+.cdn/*
+!.cdn/mods/
 .misc
 scripts/__pycache__
 dist
