@@ -1,0 +1,8 @@
+[Unit]
+Description=Starpoint daily update (9:30 BRL)
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/starpoint
+ExecStart=/home/ubuntu/starpoint/deployment/cloud/deploy.sh
