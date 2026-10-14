@@ -18,7 +18,7 @@ cd "$STARPOINT_DIR"
 echo "==> [1/8] pacotes"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq wireguard wireguard-tools dnsmasq nginx ufw qrencode curl openssl >/dev/null
+apt-get install -y -qq wireguard wireguard-tools dnsmasq nginx ufw qrencode curl openssl git >/dev/null
 if ! command -v node >/dev/null 2>&1 || [[ "$(node -v | sed 's/v//' | cut -d. -f1)" -lt 20 ]]; then
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null
     apt-get install -y -qq nodejs >/dev/null
@@ -103,17 +103,36 @@ openssl x509 -req -in generated/starpoint_wdfp.csr -CA generated/starpoint_ca.cr
     -days 3650 -sha256 -extfile generated/san.ext 2>/dev/null
 chmod 600 generated/starpoint_wdfp.key generated/starpoint_ca.key
 
-echo "==> [6/8] nginx (só no IP do túnel)"
+echo "==> [6/8] nginx (só no IP do túnel; cada domínio com seu prefixo)"
 cat > /etc/nginx/sites-available/starpoint <<EOF
 server {
     listen ${SERVER_IP_IN_TUNNEL}:443 ssl;
-    server_name na.wdfp.kakaogames.com openapi-zinny3.game.kakao.com gc-openapi-zinny3.kakaogames.com gc-infodesk-zinny3.kakaogames.com;
+    server_name na.wdfp.kakaogames.com;
     ssl_certificate ${STARPOINT_DIR}/generated/starpoint_wdfp.crt;
     ssl_certificate_key ${STARPOINT_DIR}/generated/starpoint_wdfp.key;
     location / {
         proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
         proxy_pass http://127.0.0.1:8000\$request_uri;
+    }
+}
+server {
+    listen ${SERVER_IP_IN_TUNNEL}:443 ssl;
+    server_name openapi-zinny3.game.kakao.com gc-openapi-zinny3.kakaogames.com;
+    ssl_certificate ${STARPOINT_DIR}/generated/starpoint_wdfp.crt;
+    ssl_certificate_key ${STARPOINT_DIR}/generated/starpoint_wdfp.key;
+    location / {
+        proxy_set_header Host \$host;
+        proxy_pass http://127.0.0.1:8000/openapi\$request_uri;
+    }
+}
+server {
+    listen ${SERVER_IP_IN_TUNNEL}:443 ssl;
+    server_name gc-infodesk-zinny3.kakaogames.com;
+    ssl_certificate ${STARPOINT_DIR}/generated/starpoint_wdfp.crt;
+    ssl_certificate_key ${STARPOINT_DIR}/generated/starpoint_wdfp.key;
+    location / {
+        proxy_set_header Host \$host;
+        proxy_pass http://127.0.0.1:8000/infodesk\$request_uri;
     }
 }
 server {
@@ -121,10 +140,6 @@ server {
     server_name patch.wdfp.kakaogames.com;
     ssl_certificate ${STARPOINT_DIR}/generated/starpoint_wdfp.crt;
     ssl_certificate_key ${STARPOINT_DIR}/generated/starpoint_wdfp.key;
-    location /latest/api/ {
-        proxy_set_header Host \$host;
-        proxy_pass http://127.0.0.1:8000\$request_uri;
-    }
     location / {
         proxy_set_header Host \$host;
         proxy_pass http://127.0.0.1:8000/patch\$request_uri;
@@ -164,6 +179,11 @@ EOF
 systemctl daemon-reload
 
 echo "==> [8/8] firewall (ufw)"
+# A imagem Ubuntu da Oracle vem com regra REJECT no INPUT ANTES das chains
+# do ufw — mata UDP 51820 silenciosamente (handshake nunca completa).
+# Remover em runtime e do arquivo persistente:
+iptables -D INPUT -j REJECT --reject-with icmp-host-prohibited 2>/dev/null || true
+sed -i "/reject-with icmp-host-prohibited/d" /etc/iptables/rules.v4 2>/dev/null || true
 ufw --force reset >/dev/null
 ufw default deny incoming
 ufw default allow outgoing
