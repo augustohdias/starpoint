@@ -12,8 +12,15 @@ SUDO=""
 
 echo "[deploy] $(date '+%F %T') — atualizando"
 
-if ! git pull --ff-only origin main; then
-    echo "[deploy] nada a atualizar ou conflito (mantendo versão atual)"
+# fetch + reset --hard em vez de pull: imune a conflitos com arquivos
+# untracked (ex.: mods pré-existentes) e não derruba o worktree no meio.
+git fetch origin main -q
+BEFORE=$(git rev-parse HEAD)
+git reset --hard origin/main -q
+if [[ "$BEFORE" == "$(git rev-parse HEAD)" ]]; then
+    echo "[deploy] fonte sem mudanças"
+else
+    echo "[deploy] atualizado: $(git log --oneline -1 | head -c 60)"
 fi
 
 echo "[deploy] reiniciando serviço"
